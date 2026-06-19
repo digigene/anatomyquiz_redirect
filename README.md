@@ -9,9 +9,11 @@ Live site: https://digigene.github.io/anatomyquiz_redirect/
 - **Default:** redirects mobile visitors to Google Play / App Store; desktop visitors see both store buttons.
 - **Campaign links:** supports `?source=` and `?medium=` UTM-style tracking on store URLs.
 - **Challenge invites:** URLs like `https://digigene.github.io/anatomyquiz_redirect/challenge/<inviteCode>`:
-  1. Generate/persist a `deviceUid` in `localStorage`
-  2. `POST` to backend `recordDeferredInvite` with `{ deviceUid, inviteCode }` and `x-deferred-invite-secret`
-  3. Redirect the user to the app store so they can install and accept the challenge after login
+  1. Generate/persist a `deviceUid` in `localStorage` (or reuse `?deviceUid=` from the URL)
+  2. Append `?deviceUid=<uuid>` to the invite URL via `history.replaceState` so deferred App Links carry the same UUID
+  3. `POST` to backend `recordDeferredInvite` with `{ deviceUid, inviteCode }`
+  4. Redirect the user to the app store (Play Store referrer also includes `deviceUid` on Android)
+  5. After install, the app resolves the deferred invite using the same `deviceUid` at guest login
 
 `CHALLENGE_INVITE_URL_BASE` in AWS SSM should be:
 
@@ -19,29 +21,36 @@ Live site: https://digigene.github.io/anatomyquiz_redirect/
 https://digigene.github.io/anatomyquiz_redirect/challenge
 ```
 
+### Universal links (Android + iOS)
+
+Android App Links and iOS Universal Links are verified at the **org Pages root** repo [`digigene/digigene.github.io`](https://github.com/digigene/digigene.github.io):
+
+- `https://digigene.github.io/.well-known/assetlinks.json`
+- `https://digigene.github.io/apple-app-site-association`
+
+Deploy that repo (with the `ANDROID_PLAY_SIGNING_SHA256` secret set) before expecting challenge invite links to open the installed app directly.
+
 ## Setup
 
 ### GitHub Pages deploy
 
 1. In the `digigene/anatomyquiz_redirect` repo settings, enable **GitHub Pages** from **GitHub Actions**.
-2. Add repository secret `CHALLENGE_DEFERRED_INVITE_SECRET` (same value as AWS SSM `CHALLENGE_DEFERRED_INVITE_SECRET`).
-3. Push to `main` — the workflow generates `config.js` at deploy time and publishes the site.
+2. Push to `main` — the workflow generates `config.js` at deploy time and publishes the site.
 
 ### API Gateway CORS
 
-The browser `fetch` to `recordDeferredInvite` requires CORS on **BodyQuizRestApiBase** (`r2fihr72e5`). Allow origin `https://digigene.github.io` with methods `POST, OPTIONS` and header `x-deferred-invite-secret`.
+The browser `fetch` to `recordDeferredInvite` requires CORS on **BodyQuizRestApiBase** (`r2fihr72e5`). Allow origin `https://digigene.github.io` with methods `POST, OPTIONS` and header `content-type`.
 
 ```bash
 aws apigatewayv2 update-api \
   --api-id r2fihr72e5 \
-  --cors-configuration 'AllowCredentials=false,AllowHeaders=content-type,x-deferred-invite-secret,AllowMethods=POST,AllowMethods=OPTIONS,AllowOrigins=https://digigene.github.io,MaxAge=300'
+  --cors-configuration 'AllowCredentials=false,AllowHeaders=content-type,AllowMethods=POST,AllowMethods=OPTIONS,AllowOrigins=https://digigene.github.io,MaxAge=300'
 ```
 
 ### Local testing
 
 ```bash
 cp config.example.js config.js
-# Edit config.js and set deferredInviteSecret
 python3 -m http.server 8080
 ```
 

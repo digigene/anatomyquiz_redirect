@@ -8,7 +8,6 @@
 
   var config = window.AQ_CONFIG || {};
   var apiBaseUrl = config.apiBaseUrl || "";
-  var deferredInviteSecret = config.deferredInviteSecret || "";
 
   function parseInviteCode() {
     var params = new URLSearchParams(window.location.search);
@@ -34,6 +33,13 @@
 
   function getOrCreateDeviceUid() {
     try {
+      var params = new URLSearchParams(window.location.search);
+      var fromUrl = params.get("deviceUid");
+      if (fromUrl) {
+        localStorage.setItem(DEVICE_UID_KEY, fromUrl);
+        return fromUrl;
+      }
+
       var existing = localStorage.getItem(DEVICE_UID_KEY);
       if (existing) {
         return existing;
@@ -48,8 +54,19 @@
     }
   }
 
-  function recordDeferredInvite(inviteCode) {
-    if (!apiBaseUrl || !deferredInviteSecret) {
+  function appendDeviceUidToUrl(deviceUid) {
+    try {
+      var url = new URL(window.location.href);
+      url.searchParams.set("deviceUid", deviceUid);
+      window.history.replaceState({}, "", url.toString());
+      return url.toString();
+    } catch (error) {
+      return window.location.href;
+    }
+  }
+
+  function recordDeferredInvite(inviteCode, deviceUid) {
+    if (!apiBaseUrl) {
       console.warn("Challenge invite recording skipped: missing redirect config.");
       return Promise.resolve();
     }
@@ -58,10 +75,9 @@
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-deferred-invite-secret": deferredInviteSecret,
       },
       body: JSON.stringify({
-        deviceUid: getOrCreateDeviceUid(),
+        deviceUid: deviceUid,
         inviteCode: inviteCode,
       }),
     }).then(function (response) {
@@ -73,11 +89,21 @@
     });
   }
 
-  function buildStoreUrls(source, medium) {
+  function buildStoreUrls(source, medium, deviceUid) {
     var playStoreUrl = PLAY_STORE_BASE;
     var appStoreUrl = APP_STORE_BASE;
+    var referrerParts = [];
     if (source && medium) {
-      playStoreUrl += "&referrer=" + encodeURIComponent("utm_source=" + source + "&utm_medium=" + medium);
+      referrerParts.push("utm_source=" + source);
+      referrerParts.push("utm_medium=" + medium);
+    }
+    if (deviceUid) {
+      referrerParts.push("deviceUid=" + deviceUid);
+    }
+    if (referrerParts.length > 0) {
+      playStoreUrl += "&referrer=" + encodeURIComponent(referrerParts.join("&"));
+    }
+    if (source && medium) {
       appStoreUrl += "&ct=" + encodeURIComponent(source + "_" + medium);
     }
     return { playStoreUrl: playStoreUrl, appStoreUrl: appStoreUrl };
@@ -113,9 +139,12 @@
   var source = params.get("source") || "";
   var medium = params.get("medium") || "";
   var inviteCode = parseInviteCode();
-  var storeUrls = buildStoreUrls(source, medium);
 
   if (inviteCode) {
+    var deviceUid = getOrCreateDeviceUid();
+    appendDeviceUidToUrl(deviceUid);
+    var storeUrls = buildStoreUrls(source, medium, deviceUid);
+
     var challengeTitle = document.getElementById("challenge-title");
     var challengeTagline = document.getElementById("challenge-tagline");
     if (challengeTitle) {
@@ -125,7 +154,7 @@
       challengeTagline.textContent = "Download Anatomy Quiz, sign in, and accept your friend's challenge.";
     }
 
-    recordDeferredInvite(inviteCode).finally(function () {
+    recordDeferredInvite(inviteCode, deviceUid).finally(function () {
       startRedirect(
         storeUrls.playStoreUrl,
         storeUrls.appStoreUrl,
@@ -135,5 +164,6 @@
     return;
   }
 
+  var storeUrls = buildStoreUrls(source, medium, null);
   startRedirect(storeUrls.playStoreUrl, storeUrls.appStoreUrl, "");
 })();

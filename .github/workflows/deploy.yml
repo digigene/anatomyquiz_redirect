@@ -25,14 +25,11 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Generate config.js
-        env:
-          CHALLENGE_DEFERRED_INVITE_SECRET: ${{ secrets.CHALLENGE_DEFERRED_INVITE_SECRET }}
         run: |
           node <<'NODE'
           const fs = require("fs");
           const config = {
             apiBaseUrl: "https://r2fihr72e5.execute-api.ap-southeast-2.amazonaws.com/prod",
-            deferredInviteSecret: process.env.CHALLENGE_DEFERRED_INVITE_SECRET || "",
           };
           fs.writeFileSync("config.js", `window.AQ_CONFIG = ${JSON.stringify(config)};`);
           NODE
