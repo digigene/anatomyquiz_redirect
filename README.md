@@ -34,8 +34,8 @@ Deploy that repo (with the `ANDROID_PLAY_SIGNING_SHA256` secret set) before expe
 
 ### GitHub Pages deploy
 
-1. In the `digigene/anatomyquiz_redirect` repo settings, enable **GitHub Pages** from **GitHub Actions**.
-2. Push to `main` — the workflow generates `config.js` at deploy time and publishes the site.
+1. In the `digigene/anatomyquiz_redirect` repo settings, enable **GitHub Pages** from **GitHub Actions** or deploy from `main`.
+2. Push to `main` — the workflow publishes the static site. No generated config files are required; `redirect.js` includes the production API base URL.
 
 ### API Gateway CORS
 
@@ -50,11 +50,17 @@ aws apigatewayv2 update-api \
 ### Local testing
 
 ```bash
-cp config.example.js config.js
 python3 -m http.server 8080
 ```
 
-Then open e.g. `http://localhost:8080/challenge/ABCD1234` (you may need to serve via a path-aware setup; GitHub Pages uses `404.html` for deep challenge links).
+Then open e.g. `http://localhost:8080/challenge/ABCD` (you may need to serve via a path-aware setup; GitHub Pages uses `404.html` for deep challenge links).
+
+To point at a non-production API, set `window.AQ_CONFIG` before `redirect.js` loads:
+
+```html
+<script>window.AQ_CONFIG = { apiBaseUrl: "https://your-api.example.com/prod" };</script>
+<script src="redirect.js"></script>
+```
 
 ## Files
 
@@ -62,6 +68,4 @@ Then open e.g. `http://localhost:8080/challenge/ABCD1234` (you may need to serve
 |---|---|
 | `index.html` | Main landing page |
 | `404.html` | Same as `index.html`; GitHub Pages serves this for `/challenge/<code>` deep links |
-| `redirect.js` | Store redirect + challenge invite handling |
-| `config.example.js` | Local config template |
-| `config.js` | Generated locally or by CI; not committed |
+| `redirect.js` | Store redirect + challenge invite handling (includes production API base URL) |

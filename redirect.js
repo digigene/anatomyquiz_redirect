@@ -6,8 +6,9 @@
   var DEVICE_UID_KEY = "aq_device_uid";
   var INVITE_CODE_PATTERN = /^[A-HJ-NP-Z2-9]{4,16}$/;
 
+  var DEFAULT_API_BASE_URL = "https://r2fihr72e5.execute-api.ap-southeast-2.amazonaws.com/prod";
   var config = window.AQ_CONFIG || {};
-  var apiBaseUrl = config.apiBaseUrl || "";
+  var apiBaseUrl = config.apiBaseUrl || DEFAULT_API_BASE_URL;
 
   function parseInviteCode() {
     var params = new URLSearchParams(window.location.search);
@@ -66,11 +67,6 @@
   }
 
   function recordDeferredInvite(inviteCode, deviceUid) {
-    if (!apiBaseUrl) {
-      console.warn("Challenge invite recording skipped: missing redirect config.");
-      return Promise.resolve();
-    }
-
     return fetch(apiBaseUrl + "/recordDeferredInvite", {
       method: "POST",
       headers: {
